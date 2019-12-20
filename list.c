@@ -3,14 +3,14 @@
 #include <stdlib.h>
 
 List* list_create(){
-  List* st = (List *)malloc(sizeof(List);
+  List* st = (List *)malloc(sizeof(List));
 
   st->data = (int *)malloc(sizeof(int) * LIST_INIT_SIZE);
   st->size = LIST_INIT_SIZE;
   st->top  = -1;
 
   return(st);
-}
+};
 
 void list_push(List* st, int val){
   if (st->top == st->size - 1) {

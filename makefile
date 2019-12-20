@@ -7,7 +7,7 @@ KEYS = -lrt -lpthread
 all: main
 
 main:
-        $(CC) $(SRC) $(KEYS) -o $(OUT)
+	$(CC) $(SRC) $(KEYS) -o $(OUT)
 
 clean:
-        rm $(OUT)
+	rm $(OUT)
