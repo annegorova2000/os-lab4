@@ -1,285 +1,162 @@
-#include "lin-2-list-barrier.h"
-#include <iostream>
 #include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
 #include <unistd.h>
-#include <fcntl.h>
+#include <sys/file.h>
 #include <sys/mman.h>
+#include <sys/wait.h>
+
 #include <pthread.h>
+#include "list.h"
 
-#define LISTS_NUM 10
+#define EXIT        0
+#define APPEND      1
+#define TOP         2
+#define POP         3
+#define PRINT       4
 
-int list_no(int *st);
+#define LIST_SIZE  100
 
-typedef struct
-{
-    int stor[1024];
-    pthread_mutex_t mutex;
-} shared_data;
+//Объявление структуры для общения
+typedef int struct_type;
+typedef struct {
+  pthread_mutex_t toserv;
+  pthread_mutex_t fromserv;
 
-static shared_data* data = NULL;
+  int type;
+  size_t obQty;
+  struct_type objects[LIST_SIZE];
+} message;
 
-void initialise_shared()
-{
-    int prot = PROT_READ | PROT_WRITE;
-    int flags = MAP_SHARED | MAP_ANONYMOUS;
-    data = (shared_data*)mmap(NULL, sizeof(shared_data), prot, flags, -1, 0);
-    if (data == MAP_FAILED) {
-        exit(-3);
-    }
-
-    pthread_mutexattr_t attr;
-    pthread_mutexattr_init(&attr);
-    pthread_mutexattr_setpshared(&attr, PTHREAD_PROCESS_SHARED);
-    pthread_mutex_init(&data->mutex, &attr);
+void errorDie(const char *msg) {
+  perror(msg);
+  exit(3);
 }
 
-int run_parent()
-{
-    char c;
-    char fb;
-    int st;
-    int no;
-    int val;
-    List *A[LISTS_NUM];
-    for (int i = 0; i < LISTS_NUM; i++) {
-        A[i] = NULL;
-    }
-    while (1){
-        sleep(1);
-        pthread_mutex_lock(&data->mutex);
-        scanf("%c", &c);
-        switch (c) {
-            case 'c':
-                if (list_no(&st)) {
-                    data->stor[0] = -1;
-                    break;
-                }
-                if (A[st] == NULL) {
-                    A[st] = list_create();
-                    data->stor[0] = 0;
-                } else {
-                    data->stor[0] = -1;
-                }
-                break;
-            case 'd':
-                if (list_no(&st)) {
-                    data->stor[0] = -1;
-                    break;
-                }
-                if (A[st] != NULL) {
-                    list_destroy(&A[st]);
-                    data->stor[0] = 0;
-                } else {
-                    data->stor[0] = -1;
-                }
-                break;
-            case 'a':
-                if (list_no(&st)) {
-                    data->stor[0] = -1;
-                    break;
-                }
-                if (A[st] == NULL) {
-                    data->stor[0] = -1;
-                    break;
-                }
-                if (scanf(" %c", &fb) != 1) {
-                    data->stor[0] = -1;
-                    break;
-                }
-                switch (fb) {
-                    case 'b':
-                        while (scanf("%d", &val) == 1) {
-                            list_push_front(A[st], val);
-                            c = getchar();
-                            if (getchar() == '\n') {break;}
-                        }
-                        data->stor[0] = 0;
-                        break;
-             
-                    case 'f':
-                        while (scanf("%d", &val) == 1) {
-                            list_push_back(A[st], val);
-                            c = getchar();
-                            if (getchar() == '\n') {break;}
-                        }
-                        data->stor[0] = 0;
-                        break;
-                    case 'i':
-                        if (scanf("%d %d",&no , &val) != 2) {
-                            data->stor[0] = -1;
-                            break;
-                        }
-                        if (list_insert(A[st], no, val)) {
-                            data->stor[0] = -1;
-                        } else {
-                            data->stor[0] = 0;
-                        }
-                        break;
-                    default:
-                        data->stor[0] = -1;
-                        break;
-                }
-                break;
-            case 'o':
-                if (list_no(&st)) {
-                    data->stor[0] = -1;
-                    break;
-                }
-                if (A[st] == NULL) {
-                    data->stor[0] = -1;
-                    break;
-                }
-                if (scanf(" %c", &fb) != 1) {
-                    data->stor[0] = -1;
-                    break;
-                }
-                if (list_size(A[st]) == 0) {
-                    data->stor[0] = -1;
-                    break;
-                }
-                switch (fb) {
-                    case 'b':
-                        data->stor[0] = 1;
-                        data->stor[1] = list_pop_front(A[st]);
-                        break;
-                    case 'f':
-                        data->stor[0] = 1;
-                        data->stor[1] = list_pop_back(A[st]);
-                        break;
-                    case 'i':
-                        if (scanf("%d",&no) != 1) {
-                            data->stor[0] = -1;
-                            break;
-                        }
-                        if (abs(no) > list_size(A[st]) || no == 0) {
-                            data->stor[0] = -1;
-                        } else {
-                            data->stor[0] = 1;
-                            data->stor[0] = list_get_out(A[st], no);
-                        }
-                        break;
-                    case 'p':
-                        if (scanf("%d",&no) != 1) {
-                            data->stor[0] = -1;
-                            break;
-                        }
-                        if (abs(no) > list_size(A[st]) || no == 0) {
-                            data->stor[0] = -1;
-                        } else {
-                            data->stor[0] = 1;
-                            data->stor[0] = list_peak(A[st], no);
-                        }
-                        break;
-                    default:
-                        data->stor[0] = -1;
-                        break;
-                }
-                break;
-            case 'r':
-                if (list_no(&st)) {
-                    data->stor[0] = -1;
-                    break;
-                }
-                if (A[st] == NULL) {
-                    data->stor[0] = -1;
-                    break;
-                }
-                if (scanf("%d",&no) != 1) {
-                    data->stor[0] = -1;
-                    break;
-                }
-                if (list_remove(A[st], no)) {
-                    data->stor[0] = -1;
-                } else {
-                    data->stor[0] = 0;
-                }
-                break;
-            case 'p':
-                if (list_no(&st)) {
-                    data->stor[0] = -1;
-                    break;
-                }
-                if (A[st] == NULL) {
-                    data->stor[0] = -1;
-                    break;
-                }
-                data->stor[0] = list_size(A[st]);
-                list_print(A[st], data->stor);
-                break;
-            case 'q':
-                for (int i = 0; i < 10; i++) {
-                    if (A[i] != NULL) {
-                        list_destroy(&A[i]);
-                    }
-                }
-                data->stor[0] = -2;
-                return 0;
-                break;
-            case 's':
-                if (list_no(&st)) {
-                    data->stor[0] = -1;
-                    break;
-                }
-                if (A[st] == NULL) {
-                    data->stor[0] = -1;
-                    break;
-                }
-                data->stor[0] = 1;
-                data->stor[1] = list_size(A[st]);
-                break;
-            case ' ':
-                break;
-            case '\n':
-                break;
-            default:
-                data->stor[0] = -1;
-        }
-        while(c != '\n') {
-            c = getchar();
-        }
-        pthread_mutex_unlock(&data->mutex);
-    }
+void newLine(FILE* fl) {
+  fprintf(fl, "\n");
 }
 
-int list_no(int *st)
-{
-    if (scanf("%d", st) != 1) {return 1;}
-    return *st > LISTS_NUM ? 1 : 0;
+void initMutexes(message* msg) { 
+  pthread_mutexattr_t attr;
+  pthread_mutexattr_init(&attr);
+  pthread_mutexattr_setpshared(&attr, PTHREAD_PROCESS_SHARED);
+  pthread_mutex_init(&msg->toserv, &attr);
+  pthread_mutex_init(&msg->fromserv, &attr);
 }
 
+int main(int argc, char *argv[]) {
+  int err;
 
-void run_child()
-{
-    while (true) {
-        sleep(1);
-        pthread_mutex_lock(&data->mutex);
-        std::cout << "Mesage no: " << data->stor[0] << '\n';
-        if (data->stor[0] == -2) {
-            break;
-        }
-        for (int i = 1; i <= data->stor[0]; i++) {
-            //read(pipeFdFromServ[0], &inMsg, sizeof(int));
-            std::cout << data->stor[i] << '\n';
-        }
-        pthread_mutex_unlock(&data->mutex);
+  const char *memname = "sample";
+  const size_t region_size = sysconf(_SC_PAGE_SIZE);
+
+//Создание виртуальной области памяти
+  int fd = shm_open(memname, O_CREAT | O_TRUNC | O_RDWR, 0666);
+  if (fd == -1)
+    errorDie("shm_open");
+
+  err = ftruncate(fd, region_size);
+  if (err != 0)
+    errorDie("ftruncate");
+
+  //Создание общей памяти
+  int prot = PROT_READ | PROT_WRITE;
+  int flags = MAP_SHARED | MAP_ANONYMOUS; //Изменения являются общими 
+  message* msg = (message*)mmap(NULL, region_size, prot, flags, fd, 0);
+  if (msg == MAP_FAILED)
+    errorDie("mmap");
+  close(fd);
+
+  int num = 2;
+  pid_t pid = fork();
+  
+  msg->obQty = 0;
+
+  initMutexes(msg);
+  pthread_mutex_lock(&msg->fromserv);
+  pthread_mutex_lock(&msg->toserv);
+
+  if (pid > 0) {
+    int init = 5;
+    int obQty;
+    int listSize;
+    List* list = list_create();
+    for (;;) {
+      pthread_mutex_lock(&msg->toserv);
+      listSize = list->top + 1;
+      obQty = 0;
+      switch (msg->type) {
+        case APPEND:
+          printf("append\n");
+          list_push(list, msg->objects[0]);
+          break;
+        case POP:
+          printf("pop\n");
+          list_pop(list);
+          break;
+        case TOP:
+          printf("top\n");
+          obQty = 1;
+          msg->objects[0] = list_peek(list);
+          break;
+        case PRINT:
+          printf("print\n");
+          obQty = listSize;
+          for (int i = listSize; i >= 0; --i) {
+            msg->objects[i] = list->data[i];
+          }
+          break;
+        case EXIT:
+          printf("exit\n");
+          exit(EXIT);
+          break;
+        default:
+          printf("no such type\n");
+          break;
+      }
+      msg->obQty = obQty;
+      
+      pthread_mutex_unlock(&msg->fromserv);
     }
-}
-
-int main(int argc, char** argv)
-{
-    initialise_shared();
-
-    pid_t serverPid = fork();
-    if (serverPid < 0) {
-        std::cout << "Cannot create server procces\n";
-        exit(-1);
-    } else if (serverPid == 0) {
-        std::cout << "Create server procces\n";
-        run_child();
-    } else {
-        run_parent();
+  }
+  else if (pid == 0) {
+    int action;
+    int toAppend;
+    for (;;) {
+      printf("enter num: 1. append, 2. top, 3. pop, 4. print, 0. exit\n");
+      if (scanf("%d", &action) != 1) {
+        errorDie("invalid read into action\n");
+      }
+      msg->type = action;
+      if (action == APPEND) {
+        fprintf(stdout, "enter num to append:\n");
+        if (fscanf(stdin, "%d", &toAppend) != 1)
+          errorDie("invalid read into toAppend\n");
+        msg->obQty = 1;
+        msg->objects[0] = toAppend;
+      } else if (action == EXIT) {
+        pthread_mutex_unlock(&msg->toserv);
+        wait(EXIT); 
+        exit(EXIT);
+      }
+      
+      pthread_mutex_unlock(&msg->toserv);
+      pthread_mutex_lock(&msg->fromserv);
+      // Результаты вывода
+      for (int i = 0; i < msg->obQty; ++i) {
+        printf("%d ", msg->objects[i]);
+      } newLine(stdout);
     }
+  }
 
-    munmap(data, sizeof(data));
-    return 0;
+  err = munmap(msg, region_size);
+  if (err != 0)
+    errorDie("munmap");
+
+  err = shm_unlink(memname);
+  if (err != 0)
+    errorDie("shm_unlink");
+
+  return 0;
 }
