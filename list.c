@@ -22,7 +22,6 @@ void list_push(List* st, int val){
 }
 
 int list_peek(List* st) {
-  // fprintf(stdout, "list is empty?: %d\n", list_is_empty(st));
 
   if (list_is_empty(st)) {
     fprintf(stderr, "list empty (list peek)\n");
