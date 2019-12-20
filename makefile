@@ -1,14 +1,13 @@
-CC = g++
-LD = g++
-CCFLAGS = -Wall -pedantic
-LDFLAGS =
+SRC = main.c list.c list.h
+CC = gcc
+OUT = run
 
-main.out: main.o lin-2-list-barrier.o -lrt
-	$(LD) $(LDFLAGS) -o main.out main.o lin-2-list-barrier.o -pthread  -lrt
-main.o: main.cpp lin-2-list-barrier.h lin-2-list-barrier.c
-	$(CC) $(CCFLAGS) -c main.cpp -pthread -lrt
-lin-2-list-barrier.o: lin-2-list-barrier.c lin-2-list-barrier.h
-	$(CC) $(CCFLAGS) -c lin-2-list-barrier.c
+KEYS = -lrt -lpthread
+
+all: main
+
+main:
+        $(CC) $(SRC) $(KEYS) -o $(OUT)
+
 clean:
-	rm *.o
-    
+        rm $(OUT)
