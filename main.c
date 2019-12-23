@@ -9,23 +9,23 @@
 #include <pthread.h>
 #include "list.h"
 
+// actions
 #define EXIT        0
 #define APPEND      1
 #define TOP         2
 #define POP         3
 #define PRINT       4
 
-#define LIST_SIZE  100
+#define STACK_SIZE  100
 
-//Объявление структуры для общения
 typedef int struct_type;
 typedef struct {
   pthread_mutex_t toserv;
   pthread_mutex_t fromserv;
 
-  int type;
+  int type;           // action type
   size_t obQty;
-  struct_type objects[LIST_SIZE];
+  struct_type objects[STACK_SIZE];
 } message;
 
 void errorDie(const char *msg) {
@@ -37,7 +37,7 @@ void newLine(FILE* fl) {
   fprintf(fl, "\n");
 }
 
-void initMutexes(message* msg) { 
+void initMutexes(message* msg) {
   pthread_mutexattr_t attr;
   pthread_mutexattr_init(&attr);
   pthread_mutexattr_setpshared(&attr, PTHREAD_PROCESS_SHARED);
@@ -51,7 +51,7 @@ int main(int argc, char *argv[]) {
   const char *memname = "sample";
   const size_t region_size = sysconf(_SC_PAGE_SIZE);
 
-//Создание виртуальной области памяти
+  // create firtual file
   int fd = shm_open(memname, O_CREAT | O_TRUNC | O_RDWR, 0666);
   if (fd == -1)
     errorDie("shm_open");
@@ -60,9 +60,8 @@ int main(int argc, char *argv[]) {
   if (err != 0)
     errorDie("ftruncate");
 
-  //Создание общей памяти
   int prot = PROT_READ | PROT_WRITE;
-  int flags = MAP_SHARED | MAP_ANONYMOUS; //Изменения являются общими 
+  int flags = MAP_SHARED | MAP_ANONYMOUS;
   message* msg = (message*)mmap(NULL, region_size, prot, flags, fd, 0);
   if (msg == MAP_FAILED)
     errorDie("mmap");
@@ -77,7 +76,8 @@ int main(int argc, char *argv[]) {
   pthread_mutex_lock(&msg->fromserv);
   pthread_mutex_lock(&msg->toserv);
 
-  if (pid > 0) {
+  if (pid == 0) {
+    fprintf(stdout, "child enter\n");
     int init = 5;
     int obQty;
     int listSize;
@@ -86,6 +86,9 @@ int main(int argc, char *argv[]) {
       pthread_mutex_lock(&msg->toserv);
       listSize = list->top + 1;
       obQty = 0;
+
+      // PROCESSING
+      /* fprintf(stdout, "(child)msg->type = %d\n", msg->type); */
       switch (msg->type) {
         case APPEND:
           printf("append\n");
@@ -116,14 +119,17 @@ int main(int argc, char *argv[]) {
           break;
       }
       msg->obQty = obQty;
+      // END OF PROCESSING
       
       pthread_mutex_unlock(&msg->fromserv);
     }
   }
-  else if (pid == 0) {
+  else if (pid > 0) {
+    fprintf(stdout, "parent enter\n");
     int action;
     int toAppend;
     for (;;) {
+      // IO
       printf("enter num: 1. append, 2. top, 3. pop, 4. print, 0. exit\n");
       if (scanf("%d", &action) != 1) {
         errorDie("invalid read into action\n");
@@ -140,14 +146,17 @@ int main(int argc, char *argv[]) {
         wait(EXIT); 
         exit(EXIT);
       }
+      // END OF IO
       
       pthread_mutex_unlock(&msg->toserv);
       pthread_mutex_lock(&msg->fromserv);
-      // Результаты вывода
+      // OUTPUTTING RESULTS
       for (int i = 0; i < msg->obQty; ++i) {
         printf("%d ", msg->objects[i]);
       } newLine(stdout);
     }
+  } else {
+    exit(1);
   }
 
   err = munmap(msg, region_size);

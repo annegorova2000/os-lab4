@@ -5,23 +5,24 @@
 List* list_create(){
   List* st = (List *)malloc(sizeof(List));
 
-  st->data = (int *)malloc(sizeof(int) * LIST_INIT_SIZE);
-  st->size = LIST_INIT_SIZE;
+  st->data = (int *)malloc(sizeof(int) * STACK_INIT_SIZE);
+  st->size = STACK_INIT_SIZE;
   st->top  = -1;
 
   return(st);
-};
+}
 
 void list_push(List* st, int val){
   if (st->top == st->size - 1) {
      list_resize(st);
-  }
+  } 
 
   st->top += 1;
   st->data[st->top] = val;
 }
 
 int list_peek(List* st) {
+  // fprintf(stdout, "list is empty?: %d\n", list_is_empty(st));
 
   if (list_is_empty(st)) {
     fprintf(stderr, "list empty (list peek)\n");
@@ -44,9 +45,9 @@ void list_pop(List* st) {
 
 void list_resize(List* st) {
   if (!st->size) {
-    st->size = LIST_INIT_SIZE;
+    st->size = STACK_INIT_SIZE;
   } else {
-    st->size *= LIST_MULTIPLIER;
+    st->size *= STACK_MULTIPLIER;
   }
   st->data = (int *)realloc(st->data, sizeof(int) * st->size);
 }
